@@ -8,10 +8,13 @@
 \usepackage[margin=1in]{geometry} 
 \usepackage{amsmath,amsthm,amssymb}
 \usepackage[noend]{algpseudocode}
+\usepackage{algorithm2e}
 \usepackage{float}
 \makeatletter
 \def\BState{\State\hskip-\ALG@thistlm}
 \makeatother
+
+\DeclareMathOperator{\atantwo}{atan2}
 
 \graphicspath{{media/}}
 
@@ -19,27 +22,29 @@
 
 \title{Team 9 ROB 550 BotLab}
 
-\author{Peter Mitrano, Sid Dey, Nathaniel Cox}
+\author{Peter Mitrano, Nathaniel Cox, Sidhartha Dey}
 
 \maketitle
 
 \begin{abstract}
-In the Botlab lab, teams are tasked with
+    % ASSIGNED: Nat
+    In the Botlab lab, teams are tasked with
 \end{abstract}
 \IEEEpeerreviewmaketitle
 
 \section{Introduction}
-\IEEEPARstart{T}{h}e goal of the BotLab is to \dots
-
-In this report, we discuss our implementation of SLAM, report on our systems accuracy and performance, and discuss our approach to several specific challenges like frontier exploration and the ``kidnapping'' problem.
-
+\IEEEPARstart{I}{n} this report, we discuss our implementation of SLAM, report on our systems accuracy and performance, and discuss our approach to several specific challenges like frontier exploration and the ``kidnapping'' problem.
+    
+    % ASSIGNED: Nat
+    
 \section{Methodology}
 
     Our SLAM algorithms consists of iteratively performing a localization step then a mapping step. On top of this, we choose frontier cells to explore and plan paths to those frontiers using A* on our occupancy grid.
+    % ASSIGNED: peter
     
     \subsection{Simultaneous Localization and Mapping (SLAM)}
     
-        SLAM is a well established class of algorithms which generally involve a iterative process of building a map and localizing to that map. Figure \ref{fig:sys} shows a block diagram of how our specific SLAM implementation works. They key functions of our implementation include Bresenham's algorithm to ray trace beams and find occupied and free cells and a particle filter to estimate our pose. Within the particle filter, we used an action model based on odometry to propagate the particles, and a sensor model to weight the particles.
+        SLAM is a well established class of algorithms which generally involve an iterative process of building a map and localizing to that map. Figure \ref{fig:sys} shows a block diagram of how our specific SLAM implementation works. They key functions of our implementation include Bresenham's algorithm to ray trace beams and find occupied and free cells and a particle filter to estimate our pose. Within the particle filter, we used an action model based on odometry to propagate the particles, and a sensor model to weight the particles.
         
         \begin{figure}[b]
             \centering
@@ -50,15 +55,49 @@ In this report, we discuss our implementation of SLAM, report on our systems acc
     
         \subsubsection{Mapping}
         
+        % ASSIGNED: Nat
+        
         \subsubsection{Monte Carlo Localization}
+        
+            % ASSIGNED: Sid
         
         \subsubsection{Action Model}
             % Here,I shall write something just to get started...(TODO: deletemewhenyouseeme)
             
             % TODO: Describe the action model you used. 
+            We implemented the sampling\_motion\_model\_odometry described by Thrun, Burgard and Fox \cite{Prob_Rob}. We chose to use the odometry model over the velocity model as it is more accurate than the velocity model, even though odometry suffers from error accumulation over time. \cite{Prob_Rob} presents two odometry algorithms - \texttt{motion\_model\_odometry}, which predicts the probability of action $u_{t}$ leading to state $x_{t}$ and is represented as $p(x_{t}|u_{t},x_{t-1})$, and the \texttt{sampling\_motion\_model\_odometry}, which randomly samples a state $x_{t}$ from the probability distribution$p(x_{t}|u_{t},x_{t-1})$. Here, state $x_{t}$ refers to the robot's current pose $(x,y,\theta)$. 
             
-            
+            We start by first checking whether the robot has moved, measured as the difference between the odometry readings of the current and previous state. 
+            a normal distribution with zero mean and variance proportional to the change in odometry (the action input) and the predetermined uncertainty in the robot's control. 
+      
             % TODO: Include the equations you used
+            Equations used are mentioned in Algorithm \ref{alg:action_model}.
+            
+            \begin{algorithm}[]
+            \label{alg:action_model}
+            \SetAlgoLined
+             
+             \eIf{$ |\overline{y}'-\overline{y}| < \epsilon_{x} $ \& $|\overline{x}'-\overline{x}| < \epsilon_{y}$ \&       $|\overline{\theta}'-\overline{\theta}| < \epsilon_{\theta}$}{
+                \Return  something
+                }{
+             }
+             
+             $\delta_{rot1} = \atantwo(\overline{y}'-\overline{y}, \overline{x}'-\overline{x}) - \overline{\theta}$    \\ 
+             $\delta_{trans} = \sqrt{(\overline{y}'-\overline{y})^{2} + (\overline{x}'-\overline{x})^{2}}$    \\
+             $\delta_{rot2} = \overline{\theta}' - \overline{\theta} - \delta_{rot1}$ \\
+             
+             \While{not at end of this document}{
+              read current\;
+              \eIf{understand}{
+               go to next section\;
+               current section becomes this one\;
+               }{
+               go back to the beginning of current section\;
+              }
+             }
+            \caption{\texttt{Update Action}}
+            \end{algorithm}
+                        
             % TODO: Include a table of the values of any uncertainty parameters.  
             
             
@@ -74,7 +113,7 @@ In this report, we discuss our implementation of SLAM, report on our systems acc
             We created a Poisson distribution to account for unexpectedly close obstacles by the obstacles as sensor noise. When the range was found to be less than the expected range ($z^{*}$), we used equation \ref{eq:shortprob} to find the probability of the correct range using an event rate of $\lambda_{short} = \SI{1}{\meter}$ and constant of $k_{short} =0.1$. If we found the range greater than the expected range, the probability was considered zero from the Poisson distribution.
             \begin{equation}
             	\label{eq:shortprob}
-            	p_{short}(z{^k}_t |x_t,m) = k_{rand}\lambda_{short}e^{-\lambda_{short}z{^k}_t}
+            	p_{short}(z{^k}_t |x_t,m) = k_{short}\lambda_{short}e^{-\lambda_{short}z{^k}_t}
             \end{equation}
             Lastly, we accounted for unexplainable measurements by creating a uniform probability distribution equal to the inverse of $z_{max}$ providing a probability that the sensor reading was correct regardless of location. After calculating the probability from the assigned distribution, we tuned it by multiplying with a constant of $k_{rand}=2.0$.
             
@@ -82,109 +121,84 @@ In this report, we discuss our implementation of SLAM, report on our systems acc
             
         \subsubsection{Particle Filter}
         
-        \subsection{Planning and Exploration}
+            % ASSIGNED: Sid
         
-        \begin{figure}[t]
-            \centering
-            \includegraphics[width=1\linewidth]{slam_squares.png}
-            \caption{SLAM Pose estimate versus motion capture pose.}
-            \label{fig:slam_squares}
-        \end{figure}
-        
-        \begin{figure}
-            \centering
-            \includegraphics[width=1\linewidth]{slam_squares_error.png}
-            \caption{Error over time with respect to motion capture.}
-            \label{fig:slam_squares_error.}
-        \end{figure}
+    \subsection{Planning and Exploration}
         
         \subsubsection{Exploration}
         
-        Exploring the environment to build a complete map was one of the tasks. After we build our initial map and have localized, we chose a cell near the frontier and use A* to plan a path to that cell. By iteratively choosing cells near the frontier to visit, we eventually build up a complete map of the environment.
-        
-        Our method for choosing which cell to explore starts with selecting the frontier whose centroid is furthest from the robots current position to explore. Next, we iterate over each cell in the frontier until we find one which is safe to navigate to. If we cannot do this, then we will continue on to search through cells in the next frontier.
-        
-        We discuss the successes and failures of this method in the results and discussion sections.
+            Exploring the environment to build a complete map was one of the tasks. After we build our initial map and have localized, we chose a cell near the frontier and use A* to plan a path to that cell. By iteratively choosing cells near the frontier to visit, we eventually build up a complete map of the environment.
+            
+            Our method for choosing which cell to explore starts with selecting the frontier whose centroid is furthest from the robots current position to explore. Next, we iterate over each cell in the frontier until we find one which is safe to navigate to. If we cannot do this, then we will continue on to search through cells in the next frontier.
+            
+            We discuss the successes and failures of this method in the results and discussion sections.
         
         \subsubsection{Path Planning}
         
-        Our A star algorithm was able to correctly find the optimal path in all of the provided test environments. Furthermore, the mean planning time on the realistic maze scenario was \SI{2.625}{\milli\second}, which is faster then the update period of our SLAM algorithm ($\approx$\SI{100}{\milli\second}). Therefore, our planner is fast enough to operate every cycle if necessary.
-        
-        \begin{table}
-            \centering
-            \begin{tabular}{|c|c|c|c|c|c|} \hline
-                & \multicolumn{5}{c|}{Planning Time (us)} \\ \hline
-                Environment & min & mean & max & median & stdev \\ \hline
-                convex & 194 & 197 & 218 & 195 & 7 \\ \hline
-                empty & 5332 & 5630 & 6171 & 5468 & 295 \\ \hline
-                maze & 2084 & 2625 & 3217 & 2533 & 410 \\ \hline
-                narrow & 5404 & 136776 & 271503 & 69468 & 131305 \\ \hline
-                wide & 5420 & 93529 & 268662 & 11361 & 122841 \\ \hline
-            \end{tabular}
-            \caption{A* Planning Times on the provided example problems. Statistics are computed on 20 trials on each map.}
-            \label{tab:a_star_times}
-        \end{table}
+            % ASSIGNED: peter
+            % TODO: explain how our path planner works and show an example path
         
         \subsubsection{Motion Controller}
         
-        Given our localized position and a planned path of waypoints we intend to follow, we use one of two proportional controllers to navigate along these waypoints. First, we turn to face the current target waypoint, then we follow the straight line towards that waypoint. Our controller outputs a variable forward $v$ and rotational velocity $\omega$, much like the Dubins car model. In the turning face, these control velocities are computed according to the proportional control laws \eqref{eq:turn}. We then clip the rotation velocity such that $-1 < \omega < -0.1$ or $0.1 < \omega < 1$. Here we denote the angle from the robots current pose to the target waypoint as $\phi$ and the robots current heading $\theta$. The function $d$ gives the signed smallest angle in radians between two vectors in the range $[-\pi,\pi]$. We exit the turning mode when our $d(\phi,\theta) < 0.1$.
-        
-        \begin{equation} \label{eq:turn}
-            \begin{split}
-             v &= 0 \\
-             \omega &= \text{clamp}\Big[K_\text{turn}d(\phi,\theta)\Big]
-            \end{split}
-        \end{equation}
-        
-        After turning, we switch our control laws and drive towards the target waypoint. Once again, there are two cases to consider. In the case that the current waypoint is not the final waypoint in our overall plan, we move with a constant velocity of \SI{0.1}{\meter\per\second}. Otherwise, we use Equation \eqref{eq:fwd} to compute our control. The speed is clamped such that $-0.1 < v < -0.05$ or $0.05 < v < 0.1$. We discuss the decision to move at constant speed for all intermediate waypoints in the Discussion section.
-        
-        \begin{equation} \label{eq:fwd}
-            \begin{split}
-             v &=  \text{clamp}\Big[K_\text{fwd}||p, g||_2\Big] \\
-             \omega &= \text{clamp}\Big[K_\text{turn2}\big(||p, g||_2+0.01\big)d(\phi,\theta)\Big]
-            \end{split}
-        \end{equation}
-        
-        The desired forward and rotational velocities and then converted to wheel speeds using Equation \eqref{eq:wheel_speeds}. Here $v_l$ is the left wheel speed in \SI{}{\radian\per\second} and $v_r$ is the right wheel speed, and $W$ is the distance between the wheels. The turning speeds and wheel speeds are controlled by a PID controller within the provided Mobilebot program. Additionally, the Mobilebot program uses a low pass filter to mitigate potential noise in velocity estimates. PID constants and filter parameters used are shown in Table \ref{tab:pid}.
-        
-        \begin{equation} \label{eq:wheel_speeds}
-            \begin{split}
-                v_l &= v - \omega\frac{W}{2} \\
-                r_l &= v + \omega\frac{W}{2}
-            \end{split}
-        \end{equation}
-        
-        \begin{table}[b!]
-            \centering
-            \begin{tabular}{|c|c|c|c|} \hline
-                kP & kI & kD & Filter Hz \\ \hline
-                1.0 & 0.0 & 0.0 & 25 \\ \hline
-                1.0 & 0.0 & 0.0 & 25 \\ \hline
-                0.05 & 0.0 & 0.0 & 10 \\ \hline
-                0.05 & 0.0 & 0.0 & 10 \\ \hline
-            \end{tabular}
-            \caption{PID constants used in the provided Mobilebot program}
-            \label{tab:pid}
-        \end{table}
+            Given our localized position and a planned path of waypoints we intend to follow, we use one of two proportional controllers to navigate along these waypoints. First, we turn to face the current target waypoint, then we follow the straight line towards that waypoint. Our controller outputs a variable forward $v$ and rotational velocity $\omega$, much like the Dubins car model. In the turning face, these control velocities are computed according to the proportional control laws \eqref{eq:turn}. We then clip the rotation velocity such that $-1 < \omega < -0.1$ or $0.1 < \omega < 1$. Here we denote the angle from the robots current pose to the target waypoint as $\phi$ and the robots current heading $\theta$. The function $d$ gives the signed smallest angle in radians between two vectors in the range $[-\pi,\pi]$. We exit the turning mode when our $d(\phi,\theta) < 0.1$.
+            
+            \begin{equation} \label{eq:turn}
+                \begin{split}
+                 v &= 0 \\
+                 \omega &= \text{clamp}\Big[K_\text{turn}d(\phi,\theta)\Big]
+                \end{split}
+            \end{equation}
+            
+            After turning, we switch our control laws and drive towards the target waypoint. Once again, there are two cases to consider. In the case that the current waypoint is not the final waypoint in our overall plan, we move with a constant velocity of \SI{0.1}{\meter\per\second}. Otherwise, we use Equation \eqref{eq:fwd} to compute our control. The speed is clamped such that $-0.1 < v < -0.05$ or $0.05 < v < 0.1$. We discuss the decision to move at constant speed for all intermediate waypoints in the Discussion section.
+            
+            \begin{equation} \label{eq:fwd}
+                \begin{split}
+                 v &=  \text{clamp}\Big[K_\text{fwd}||p, g||_2\Big] \\
+                 \omega &= \text{clamp}\Big[K_\text{turn2}\big(||p, g||_2+0.01\big)d(\phi,\theta)\Big]
+                \end{split}
+            \end{equation}
+            
+            The desired forward and rotational velocities and then converted to wheel speeds using Equation \eqref{eq:wheel_speeds}. Here $v_l$ is the left wheel speed in \SI{}{\radian\per\second} and $v_r$ is the right wheel speed, and $W$ is the distance between the wheels. The turning speeds and wheel speeds are controlled by a PID controller within the provided Mobilebot program. Additionally, the Mobilebot program uses a low pass filter to mitigate potential noise in velocity estimates. PID constants and filter parameters used are shown in Table \ref{tab:pid}.
+            
+            \begin{equation} \label{eq:wheel_speeds}
+                \begin{split}
+                    v_l &= v - \omega\frac{W}{2} \\
+                    r_l &= v + \omega\frac{W}{2}
+                \end{split}
+            \end{equation}
+            
+            \begin{table}[b!]
+                \centering
+                \begin{tabular}{|c|c|c|c|} \hline
+                    kP & kI & kD & Filter Hz \\ \hline
+                    1.0 & 0.0 & 0.0 & 25 \\ \hline
+                    1.0 & 0.0 & 0.0 & 25 \\ \hline
+                    0.05 & 0.0 & 0.0 & 10 \\ \hline
+                    0.05 & 0.0 & 0.0 & 10 \\ \hline
+                \end{tabular}
+                \caption{PID constants used in the provided Mobilebot program}
+                \label{tab:pid}
+            \end{table}
     
 \section{Results}
 
     \subsection{Simultaneous Localization and Mapping (SLAM)}
     
         \subsubsection{Mapping}
-    \begin{figure}[b]
-        \centering
-        \includegraphics[width=1\linewidth]{obstacle_slam_10mx10m_5cm-map.png}
-        \caption{Map built on the log file obstacle\_slam\_10mx10m\_5cm.log. True pose of the robot is shown in red.}
-        \label{fig:map}
-    \end{figure}
-    
-    \begin{figure}[b]
-        \centering
-        \includegraphics[width=1\linewidth]{odometry4.png}
-        \caption{Plot of our robot performing four \SI{1}{\meter} squares. Blue is pose estimate from odometry, yellow is the motion capture pose.}
-        \label{fig:odometry_squares}
-    \end{figure}
+            % ASSIGNED: Nat
+            \begin{figure}[b]
+                \centering
+                \includegraphics[width=1\linewidth]{obstacle_slam_10mx10m_5cm-map.png}
+                \caption{Map built on the log file obstacle\_slam\_10mx10m\_5cm.log. True pose of the robot is shown in red.}
+                \label{fig:map}
+            \end{figure}
+            
+            \begin{figure}[b]
+                \centering
+                \includegraphics[width=0.75\linewidth]{odometry4.png}
+                \caption{Plot of our robot performing four \SI{1}{\meter} squares. Blue is pose estimate from odometry, yellow is the motion capture pose.}
+                \label{fig:odometry_squares}
+            \end{figure}
     
         \subsubsection{Monte Carlo Localization Accuracy}
         
@@ -214,8 +228,10 @@ In this report, we discuss our implementation of SLAM, report on our systems acc
                 \caption{Error over time with respect to motion capture on the obstacle\_slam\_10mx10m\_5cm.log.}
                 \label{fig:localization_error}
             \end{figure}
+            
+            % ASSIGNED: Sid
         
-            \begin{figure}[b]
+            \begin{figure}[t]
                 \centering
                 \includegraphics[width=1\linewidth]{drive_square_particles.png}
                 \caption{Particles shown at various positions along a square path. Note that uncertainty is higher along the direction of motion.}
@@ -226,7 +242,7 @@ In this report, we discuss our implementation of SLAM, report on our systems acc
         
             It is essential that our SLAM system is fast enough to run in real time on our robot, otherwise the SLAM pose estimate will eventually lag behind our true pose. To quantify this, we measured how long it takes to update our paticle filter for various numbers of particles. The timing results are shown in Table \ref{tab:filter_perf}.
     
-            \begin{table}[b]
+            \begin{table}[t]
                 \centering
                 \begin{tabular}{|c|c|} \hline
                      \# Particles & Time (ms) \\
@@ -249,15 +265,97 @@ In this report, we discuss our implementation of SLAM, report on our systems acc
                 \label{fig:perf}
             \end{figure}
             
+        \subsubsection{Combined SLAM Accuracy}
+        
+            % ASSIGNED: peter
+        
+            Finally, we measured the overall accuracy of our combined SLAM implementation. In this test, we drove the robot in 4 squares in the environment while running mapping and localization.
+            
+            \begin{figure}[t]
+                \centering
+                \includegraphics[width=1\linewidth]{slam_squares.png}
+                \caption{SLAM Pose estimate versus motion capture pose.}
+                \label{fig:slam_squares}
+            \end{figure}
+            
+            \begin{figure}
+                \centering
+                \includegraphics[width=1\linewidth]{slam_squares_error.png}
+                \caption{Error over time with respect to motion capture.}
+                \label{fig:slam_squares_error.}
+            \end{figure}
+    
+    \subsection{Planning and Exploration}
+    
+        \subsubsection{Path Planning}
+        
+            Our A star algorithm was able to correctly find the optimal path in all of the provided test environments. Furthermore, the mean planning time on the realistic maze scenario was \SI{2.625}{\milli\second}, which is faster then the update period of our SLAM algorithm ($\approx$\SI{100}{\milli\second}). Therefore, our planner is fast enough to operate every cycle if necessary.
+            
+            \begin{table}
+                \centering
+                \begin{tabular}{|c|c|c|c|c|c|} \hline
+                    & \multicolumn{5}{c|}{Planning Time (us)} \\ \hline
+                    Environment & min & mean & max & median & stdev \\ \hline
+                    convex & 194 & 197 & 218 & 195 & 7 \\ \hline
+                    empty & 5332 & 5630 & 6171 & 5468 & 295 \\ \hline
+                    maze & 2084 & 2625 & 3217 & 2533 & 410 \\ \hline
+                    narrow & 5404 & 136776 & 271503 & 69468 & 131305 \\ \hline
+                    wide & 5420 & 93529 & 268662 & 11361 & 122841 \\ \hline
+                \end{tabular}
+                \caption{A* Planning Times on the provided example problems. Statistics are computed on 20 trials on each map.}
+                \label{tab:a_star_times}
+            \end{table}
+        
+            After quantifying the performance of our A* planner, we tested the ability of our controller to follow the generates paths in with known map. In this experiment, we used the particle filter localization and manually selected a goal to plan our path. Figure \ref{fig:astar} shows the SLAM pose and motion capture pose of our robot as well as the path we intended to follow. Figure \ref{fig:astar_error} shows the error with respect to that path over time. The mean position error of our true pose with respect to the astar pose was \SI{99999}{\centi\meter}.
+            
+            \begin{figure}
+                \centering
+                \includegraphics[width=1\linewidth]{}
+                \caption{Position over time of slam pose (red) and motion capture pose (blue) along with the planned path (green).}
+                \label{fig:astar}
+            \end{figure}
+            
+            \begin{figure}
+                \centering
+                \includegraphics[width=1\linewidth]{}
+                \caption{Position error over time of motion capture pose versus the planned path.}
+                \label{fig:astar_error}
+            \end{figure}
+    
+        \subsubsection{Motion Controller}
+        
+            % ASSIGNED: peter
+        
+            \begin{figure}
+                \centering
+                \includegraphics[width=1\linewidth]{}
+                \caption{Plot showing the odometry pose versus the intended path. Our motion controller tends to oscillate around the target path and overshoot waypoints.}
+                \label{fig:motion_controller}
+            \end{figure}
+    
+            
 \section{Discussion}
-    
-    \subsection{Motion Controller}
-    
-    When we first used our motion controller to follow paths, we noticed that the robot spent a lot of time turning to follow waypoints that are space very close together. This meant that the robot took a long time to follow a path. To mitigate this, we both increased the position and angle tolerance for intermediate waypoints and also chose to fix the forward speed when navigating to intermediate waypoints. This way the robot did not stop, in the event that the next waypoint is in a straight line, which was often the case in our experience, that path is execute more smoothly and more quickly.
 
+    \subsection{Simultaneous Localization and Mapping (SLAM)}
+    
+        \subsubsection{Monte Carlo Localization Accuracy}
+        
+            % ASSIGNED: peter
+            It worked great on logs bot terribly on the real robot
+        
+            
+        \subsubsection{Particle Filter}
+
+    \subsection{Planning and Exploration}
+    
+        \subsubsection{Motion Controller}
+    
+            When we first used our motion controller to follow paths, we noticed that the robot spent a lot of time turning to follow waypoints that are space very close together. This meant that the robot took a long time to follow a path. To mitigate this, we both increased the position and angle tolerance for intermediate waypoints and also chose to fix the forward speed when navigating to intermediate waypoints. This way the robot did not stop, in the event that the next waypoint is in a straight line, which was often the case in our experience, that path is execute more smoothly and more quickly.
+    
 \section{Conclusion}
 
     Group 9 successfully completed the BotLab lab, ...
+    % ASSIGNED: peter
 
 \bibliographystyle{IEEEtran}
 \bibliography{550-botlab}
